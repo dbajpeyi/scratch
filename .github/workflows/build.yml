@@ -1,0 +1,79 @@
+name: Build
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write # only used to attach zips to a release on v* tags
+
+jobs:
+  macos:
+    name: macOS (VST3 + AU, universal)
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64"
+
+      - name: Build
+        run: cmake --build build --config Release --target CrateCut_VST3 CrateCut_AU CrateCut_Standalone -j 4
+
+      - name: Sign (ad-hoc) and package
+        run: |
+          ART=build/CrateCut_artefacts/Release
+          mkdir -p dist
+          for b in "$ART/VST3/CrateCut.vst3" "$ART/AU/CrateCut.component" "$ART/Standalone/CrateCut.app"; do
+            codesign --force --deep --sign - "$b"
+          done
+          ditto -c -k --keepParent "$ART/VST3/CrateCut.vst3"      dist/CrateCut-VST3-mac.zip
+          ditto -c -k --keepParent "$ART/AU/CrateCut.component"   dist/CrateCut-AU-mac.zip
+          ditto -c -k --keepParent "$ART/Standalone/CrateCut.app" dist/CrateCut-Standalone-mac.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CrateCut-macOS
+          path: dist/*.zip
+
+      - name: Validate the Audio Unit (auval)
+        run: |
+          mkdir -p ~/Library/Audio/Plug-Ins/Components
+          cp -R build/CrateCut_artefacts/Release/AU/CrateCut.component ~/Library/Audio/Plug-Ins/Components/
+          killall -9 AudioComponentRegistrar || true
+          auval -v aumu Ccdk Crcu
+
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.zip
+
+  tests:
+    name: Linux (offline DSP tests)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build libasound2-dev libx11-dev libxrandr-dev libxinerama-dev \
+            libxcursor-dev libxext-dev libfreetype-dev libfontconfig1-dev libgl-dev
+
+      - name: Build tests
+        run: |
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCRATECUT_BUILD_TESTS=ON
+          cmake --build build --target CrateCutTests
+
+      - name: Run tests
+        run: ./build/CrateCutTests_artefacts/Release/CrateCutTests test-output
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-renders
+          path: test-output/
