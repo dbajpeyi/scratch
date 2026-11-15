@@ -17,8 +17,9 @@ CrateCutProcessor::CrateCutProcessor()
 
     auto get = [this] (const char* id) { return apvts.getRawParameterValue (id); };
     raw = { get (ParamID::touch), get (ParamID::scratch), get (ParamID::fader), get (ParamID::motor),
-            get (ParamID::pitch), get (ParamID::range), get (ParamID::handSmooth), get (ParamID::slipmat),
-            get (ParamID::startTime), get (ParamID::brakeTime), get (ParamID::rpm), get (ParamID::pitchRange),
+            get (ParamID::reverse), get (ParamID::hold), get (ParamID::mute), get (ParamID::pitch), get (ParamID::range),
+            get (ParamID::handSmooth), get (ParamID::inputSmooth), get (ParamID::slipmat), get (ParamID::fastSmooth),
+            get (ParamID::speed), get (ParamID::accel), get (ParamID::sensitivity), get (ParamID::brakeTime), get (ParamID::rpm), get (ParamID::pitchRange),
             get (ParamID::faderCurve), get (ParamID::hamster), get (ParamID::volume), get (ParamID::pan),
             get (ParamID::phono), get (ParamID::noise), get (ParamID::loop), get (ParamID::chopMode),
             get (ParamID::slices), get (ParamID::noteOff), get (ParamID::noteStart), get (ParamID::velocity),
@@ -60,9 +61,16 @@ EngineParams CrateCutProcessor::readParams() const
     p.faderCurve  = raw.faderCurve->load();
     p.hamster     = b (raw.hamster);
     p.motor       = b (raw.motor);
+    p.reverse     = b (raw.reverse);
+    p.hold        = b (raw.hold);
+    p.mute        = b (raw.mute);
+    p.speed       = raw.speed->load();
+    p.sensitivity = raw.sensitivity->load();
+    p.inputTau    = raw.inputSmooth->load() * 0.001f;
+    p.fastSmooth  = raw.fastSmooth->load();
     p.rpmFactor   = Choices::rpmFactor[jlimit (0, 2, i (raw.rpm))];
     p.pitch       = raw.pitch->load() * Choices::pitchSpan[jlimit (0, 2, i (raw.pitchRange))];
-    p.startTime   = raw.startTime->load();
+    p.startTime   = accelToStartTime (raw.accel->load());
     p.brakeTime   = raw.brakeTime->load();
     p.slipTime    = raw.slipmat->load() * 0.001f;
     p.handTau     = raw.handSmooth->load() * 0.001f;

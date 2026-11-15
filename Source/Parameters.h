@@ -9,13 +9,20 @@ namespace ParamID
     inline constexpr const char* scratch     = "scratch";
     inline constexpr const char* fader       = "fader";
     inline constexpr const char* motor       = "motor";
+    inline constexpr const char* reverse     = "reverse";
+    inline constexpr const char* hold        = "hold";
+    inline constexpr const char* mute        = "mute";
     inline constexpr const char* pitch       = "pitch";
 
     // Deck feel
     inline constexpr const char* range       = "range";
-    inline constexpr const char* handSmooth  = "handSmooth";
-    inline constexpr const char* slipmat     = "slipmat";
-    inline constexpr const char* startTime   = "startTime";
+    inline constexpr const char* handSmooth  = "handSmooth";   // smooth 1
+    inline constexpr const char* inputSmooth = "inputSmooth";  // smooth 2
+    inline constexpr const char* slipmat     = "slipmat";      // smooth 3
+    inline constexpr const char* fastSmooth  = "fastSmooth";   // smooth 4
+    inline constexpr const char* speed       = "speed";
+    inline constexpr const char* accel       = "accel";
+    inline constexpr const char* sensitivity = "sensitivity";
     inline constexpr const char* brakeTime   = "brakeTime";
     inline constexpr const char* rpm         = "rpm";
     inline constexpr const char* pitchRange  = "pitchRange";
@@ -69,5 +76,8 @@ namespace Choices
 
 /** 128 means "off" for the note / CC mapping parameters. */
 inline constexpr int kMidiOff = 128;
+
+/** Acceleration (0..1) -> motor start time in seconds (0 -> 4 s, default 0.33 -> ~0.7 s, 1 -> 20 ms). */
+inline float accelToStartTime (float accel) { return 4.0f * std::pow (0.005f, accel); }
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

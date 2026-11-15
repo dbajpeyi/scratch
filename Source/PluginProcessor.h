@@ -77,8 +77,8 @@ private:
 
     struct RawParams
     {
-        std::atomic<float> *touch, *scratch, *fader, *motor, *pitch, *range, *handSmooth, *slipmat,
-                           *startTime, *brakeTime, *rpm, *pitchRange, *faderCurve, *hamster, *volume, *pan,
+        std::atomic<float> *touch, *scratch, *fader, *motor, *reverse, *hold, *mute, *pitch, *range,
+                           *handSmooth, *inputSmooth, *slipmat, *fastSmooth, *speed, *accel, *sensitivity, *brakeTime, *rpm, *pitchRange, *faderCurve, *hamster, *volume, *pan,
                            *phono, *noise, *loop, *chopMode, *slices, *noteOff, *noteStart, *velocity, *hostSync,
                            *baseNote, *touchNote, *cutNote, *touchCC, *scratchCC, *faderCC, *jogCC, *jogEncoding,
                            *jogTicks, *bendScratch;

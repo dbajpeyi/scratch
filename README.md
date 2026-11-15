@@ -15,13 +15,35 @@ The deck is a physical model, not a playback-rate knob:
 
 | Part | What's modelled |
 |---|---|
-| **Motor** | Direct-drive torque: the platter takes ~0.7 s to reach 33 rpm and brakes over ~1 s (both adjustable). |
+| **Motor** | Direct-drive torque: the platter takes ~0.7 s to reach 33 rpm and brakes over ~1 s (ACC and BRAKE). It plays forwards or backwards. |
 | **Slipmat** | Coulomb friction. When you let go, the spinning platter drags the record back up to speed in a linear ramp (~45 ms). That's the classic "release" sound. |
 | **Hand** | A critically damped spring between your hand and the record. Grabbing a spinning record stops it dead without springing back. Automation and MIDI steps are smoothed into continuous motion, so there's no zipper noise. |
 | **Groove** | The sample is RIAA pre-emphasised at load ("cut to vinyl"). Surface noise and crackle are pressed into the groove too, so they scratch back and forth with the record. |
 | **Cartridge + phono stage** | Output follows stylus *velocity*, then fixed RIAA de-emphasis. Slow drags fade towards silence, fast pushes hit harder than the source, and the polarity flips on the back-stroke, just like a real cartridge. At exactly 1× it's transparent (tested to −43 dB residual). |
 | **Needle** | A band-limited sinc reader with a kernel that widens with speed. Fast flicks don't alias and slow groans don't buzz. Works both directions. |
 | **Crossfader** | Scratch-mixer cut curve with a small cut-lag, adjustable from smooth to razor, plus hamster reverse. Click-free cuts. |
+
+## Coming from Fruity Scratcher
+
+Every Fruity Scratcher control has an equivalent here. Image-Line doesn't
+document what each of its four SMOOTH knobs does internally, so CrateCut
+defines its own four, each with one clear job:
+
+| Fruity Scratcher | CrateCut | What it does here |
+|---|---|---|
+| SMOOTH 1 | **1 HAND** | The give between hand and record. Low is tight and twitchy, high gives soft, rounded strokes. |
+| SMOOTH 2 | **2 INPUT** | Glides between control points (mouse moves, MIDI steps, automation). Raise it for a coarse mouse or 7-bit CC; keep it near 0 for a high-resolution mouse or pen tablet. |
+| SMOOTH 3 | **3 SLIP** | Slipmat grip: how fast the platter pulls the record back up to speed when you let go. |
+| SMOOTH 4 | **4 FAST** | Softens the top end of very fast movements, taking the fizz off hard flicks. |
+| PAN / VOL | **PAN / VOL** | Balance and level. |
+| HOLD | **HOLD** | Holds the record still. Turn it on when a controller drives the platter: the linked *Scratch* parameter then moves the record directly, with no *Touch* needed. |
+| MUTE | **MUTE** | Click-free mute, handy for automation. |
+| SPEED | **SPEED** | Playback speed (1× = normal). Stacks with 33/45/78 and the pitch fader. |
+| ACC | **ACC** | How quickly the motor gets the platter up to speed. |
+| SEN | **SEN** | How far the record moves for a given mouse, jog wheel, pitch-bend or CC movement. |
+| ◀ ❚❚ ▶ | **TRANSPORT** | Play backwards, pause (the platter brakes to a stop), play forwards. |
+| Right-click platter → Link to controller | **Right-click the platter** | Opens FL's menu for the *Scratch* parameter, so you can link a controller or create an automation clip. Turn on HOLD when you do. Every knob and fader has the same right-click menu. |
+| Waveform / folder / 2x | **Waveform / LOAD / 1x-2x** | Click the waveform to drop the needle, load by button or drag-and-drop, and zoom the window. |
 
 ## Ways to scratch
 

@@ -5,6 +5,8 @@
 #include "ui/CrateLookAndFeel.h"
 #include "ui/PlatterView.h"
 #include "ui/WaveformView.h"
+#include "ui/TransportButton.h"
+#include "ui/HostMenu.h"
 
 class CrateCutEditor : public juce::AudioProcessorEditor,
                        public juce::FileDragAndDropTarget,
@@ -69,6 +71,9 @@ private:
     void loadFile (const juce::File&);
     void showStatus (const juce::String&, bool isError);
     void setRpm (int index);
+    void syncButtons();
+    void setTransport (bool motorOn, bool reverse);
+    void setParam (const char* id, float value);
 
     CrateCutProcessor& proc;
     CrateLookAndFeel lnf;
@@ -78,17 +83,20 @@ private:
     PlatterView platter;
     WaveformView waveform;
 
-    Knob range, hand, slipmat, noise, startTime, brakeTime, faderCurve, volume, pan;
-    Toggle phono, loop, hostSync, hamster, velocity;
+    Knob smoothHand, smoothInput, smoothSlip, smoothFast;
+    Knob range, noise, speed, accel, sensitivity, brakeTime, faderCurve, volume, pan;
+    Toggle phono, loop, hostSync, hamster, velocity, hold, mute;
     Combo chopMode, slices, noteOff, noteStart, pitchRange;
 
     juce::Slider pitch { juce::Slider::LinearVertical, juce::Slider::NoTextBox };
     juce::Slider crossfader { juce::Slider::LinearHorizontal, juce::Slider::NoTextBox };
     std::unique_ptr<APVTS::SliderAttachment> pitchAttachment, faderAttachment;
 
-    juce::TextButton motorButton { "START / STOP" };
-    std::unique_ptr<APVTS::ButtonAttachment> motorAttachment;
+    TransportButton playBackwards { TransportButton::Icon::backwards, "Play backwards" };
+    TransportButton pauseButton   { TransportButton::Icon::pause, "Pause" };
+    TransportButton playForwards  { TransportButton::Icon::forwards, "Play forwards" };
     juce::TextButton rpmButtons[3];
+    std::vector<std::unique_ptr<HostMenuOnRightClick>> hostMenus;
     juce::TextButton loadButton { "LOAD" }, sizeButton { "1x" };
 
     std::unique_ptr<juce::FileChooser> chooser;

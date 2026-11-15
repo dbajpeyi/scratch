@@ -17,12 +17,19 @@ struct EngineParams
     float faderCurve = 0.85f;
     bool  hamster = false;
     bool  motor = true;
+    bool  reverse = false;       // platter turns backwards
+    bool  hold = false;          // record held still; controllers move it directly
+    bool  mute = false;
+    float speed = 1.0f;          // playback speed multiplier
+    float sensitivity = 1.0f;    // scales jog / bend / CC hand movement
+    float inputTau = 0.0f;       // seconds: interpolation between control points (smooth 2)
+    float fastSmooth = 0.0f;     // 0..1: extra softening of fast cuts (smooth 4)
     float rpmFactor = 1.0f;
     float pitch = 0.0f;          // as a fraction, e.g. 0.08 = +8 %
     float startTime = 0.7f;      // seconds 0 -> 33 rpm
     float brakeTime = 1.0f;      // seconds 33 rpm -> 0
-    float slipTime = 0.045f;     // seconds for the slipmat to drag the record 0 -> 33 rpm
-    float handTau = 0.010f;      // seconds
+    float slipTime = 0.045f;     // seconds for the slipmat to drag the record 0 -> 33 rpm (smooth 3)
+    float handTau = 0.010f;      // seconds (smooth 1)
     bool  phono = true;
     float noise = 0.2f;
     bool  loop = true;
@@ -109,13 +116,16 @@ private:
     double speed = 0.0;           // record speed, 1 = 33 rpm at 0 %
     double platterSpeed = 0.0;
     double platterAngle = 0.0;
-    double hand = 0.0;            // hand target position (seconds)
+    double hand = 0.0;            // smoothed hand target position (seconds)
+    double handMid = 0.0;         // first input-smoothing stage
+    double handRaw = 0.0;         // hand target before input smoothing
     double handVelocity = 0.0;    // feed-forward from smooth automation ramps
     bool   touching = false;
     double currentHandTau = 0.01;
+    double currentSensitivity = 1.0;
 
     // Touch sources
-    bool paramTouch = false, ccTouch = false, noteTouch = false, bendTouch = false, handStopTouch = false;
+    bool paramTouch = false, holdTouch = false, ccTouch = false, noteTouch = false, bendTouch = false, handStopTouch = false;
     int  autoTouchSamples = 0;
 
     // Note / gate state

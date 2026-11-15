@@ -1,5 +1,6 @@
 #include "PlatterView.h"
 #include "CrateLookAndFeel.h"
+#include "HostMenu.h"
 #include "../PluginProcessor.h"
 
 using namespace juce;
@@ -14,6 +15,7 @@ PlatterView::PlatterView (CrateCutProcessor& p) : processor (p)
     touchParam = processor.apvts.getParameter (ParamID::touch);
     scratchParam = processor.apvts.getParameter (ParamID::scratch);
     rangeParam = processor.apvts.getParameter (ParamID::range);
+    sensitivityParam = processor.apvts.getParameter (ParamID::sensitivity);
     setOpaque (false);
     setRepaintsOnMouseActivity (false);
 }
@@ -324,6 +326,14 @@ void PlatterView::mouseDown (const MouseEvent& e)
 {
     if (! hitsRecord (e.position)) return;
 
+    // Right-click: the host's menu for the Scratch parameter (FL: "Link to controller").
+    // Turn HOLD on when a controller drives the platter.
+    if (e.mods.isPopupMenu())
+    {
+        showHostParameterMenu (*this, scratchParam);
+        return;
+    }
+
     dragging = true;
     lastAngle = angleAt (e.position);
     scratchValue = 0.0f;
@@ -346,7 +356,8 @@ void PlatterView::mouseDrag (const MouseEvent& e)
 
     // screen y points down, so a clockwise drag (forward play) is a positive angle
     const float range = jmax (0.01f, rangeParam->convertFrom0to1 (rangeParam->getValue()));
-    scratchValue = jlimit (-1.0f, 1.0f, scratchValue + delta / twoPi / range);
+    const float sensitivity = sensitivityParam->convertFrom0to1 (sensitivityParam->getValue());
+    scratchValue = jlimit (-1.0f, 1.0f, scratchValue + sensitivity * delta / twoPi / range);
     scratchParam->setValueNotifyingHost (scratchParam->convertTo0to1 (scratchValue));
 }
 

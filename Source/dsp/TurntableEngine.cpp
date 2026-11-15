@@ -28,8 +28,8 @@ void TurntableEngine::reset()
 {
     position = 0.0;
     speed = platterSpeed = 1.0;
-    hand = handVelocity = 0.0;
-    touching = paramTouch = ccTouch = noteTouch = bendTouch = handStopTouch = false;
+    hand = handMid = handRaw = handVelocity = 0.0;
+    touching = holdTouch = paramTouch = ccTouch = noteTouch = bendTouch = handStopTouch = false;
     autoTouchSamples = 0;
     noteBrake = noteCut = false;
     cutNotesHeld = 0;
@@ -50,7 +50,7 @@ void TurntableEngine::setRecord (const RecordData* newRecord)
 {
     if (newRecord == record) return;
     record = newRecord;
-    position = hand = 0.0;
+    position = hand = handMid = handRaw = 0.0;
     ghost = {};
     mainGain = 1.0f;
     chopsRecord = nullptr; // force refresh
@@ -58,7 +58,7 @@ void TurntableEngine::setRecord (const RecordData* newRecord)
 
 double TurntableEngine::platterTarget (const EngineParams& p) const noexcept
 {
-    return (double) p.rpmFactor * (1.0 + (double) p.pitch);
+    return (double) p.rpmFactor * (1.0 + (double) p.pitch) * (double) p.speed * (p.reverse ? -1.0 : 1.0);
 }
 
 // ---------------------------------------------------------------------------
@@ -66,7 +66,7 @@ double TurntableEngine::platterTarget (const EngineParams& p) const noexcept
 // ---------------------------------------------------------------------------
 void TurntableEngine::updateTouch()
 {
-    const bool shouldTouch = paramTouch || ccTouch || noteTouch || bendTouch || handStopTouch || autoTouchSamples > 0;
+    const bool shouldTouch = paramTouch || holdTouch || ccTouch || noteTouch || bendTouch || handStopTouch || autoTouchSamples > 0;
     if (shouldTouch == touching) return;
 
     touching = shouldTouch;
@@ -76,7 +76,7 @@ void TurntableEngine::updateTouch()
         // record stops it without the spring yanking it backwards afterwards.
         // For a critically damped spring starting at speed v, a target at
         // position + v * tau gives a monotonic stop.
-        hand = position + speed * currentHandTau;
+        hand = handMid = handRaw = position + speed * currentHandTau;
         handVelocity = 0.0;
     }
 }
@@ -89,12 +89,12 @@ void TurntableEngine::moveHand (double grooveSeconds, double autoTouchSeconds)
         updateTouch();
     }
     if (touching)
-        hand += grooveSeconds;
+        handRaw += grooveSeconds;
 }
 
 void TurntableEngine::jogRotations (double rotations)
 {
-    moveHand (rotations * secondsPerRotation, jogAutoTouchSeconds);
+    moveHand (rotations * secondsPerRotation * currentSensitivity, jogAutoTouchSeconds);
 }
 
 void TurntableEngine::seekSeconds (double seconds)
@@ -110,6 +110,8 @@ void TurntableEngine::seekSeconds (double seconds)
     const double delta = seconds - position;
     position = seconds;
     hand += delta;
+    handMid += delta;
+    handRaw += delta;
 }
 
 // ---------------------------------------------------------------------------
@@ -130,7 +132,7 @@ void TurntableEngine::restartForHostPlayback (const EngineParams& p)
 {
     // Every render starts from exactly the same state - no crossfade from wherever
     // the needle was, no filter history - so automation plays back identically.
-    position = hand = 0.0;
+    position = hand = handMid = handRaw = 0.0;
     handVelocity = 0.0;
     ghost = {};
     mainGain = 1.0f;
@@ -148,7 +150,7 @@ void TurntableEngine::restartForHostPlayback (const EngineParams& p)
     lastScratchCC = -2.0;
     platterAngle = 0.0;
     platterSpeed = speed = platterTarget (p);
-    paramTouch = ccTouch = noteTouch = bendTouch = handStopTouch = false;
+    paramTouch = holdTouch = ccTouch = noteTouch = bendTouch = handStopTouch = false;
     autoTouchSamples = 0;
     noteBrake = noteCut = false;
     cutNotesHeld = 0;
@@ -234,7 +236,7 @@ void TurntableEngine::handleMidi (const MidiMessage& m, const EngineParams& p)
         {
             const double v = value / 127.0 * 2.0 - 1.0;
             if (lastScratchCC > -1.5)
-                moveHand ((v - lastScratchCC) * p.rangeRot * secondsPerRotation, ccAutoTouchSeconds);
+                moveHand ((v - lastScratchCC) * p.rangeRot * secondsPerRotation * p.sensitivity, ccAutoTouchSeconds);
             lastScratchCC = v;
         }
         if (cc == p.jogCC)
@@ -269,7 +271,7 @@ void TurntableEngine::handleMidi (const MidiMessage& m, const EngineParams& p)
             updateTouch();
         }
         if (touching)
-            hand += (bend - lastBend) * p.rangeRot * secondsPerRotation;
+            handRaw += (bend - lastBend) * p.rangeRot * secondsPerRotation * p.sensitivity;
         lastBend = bend;
 
         if (! offCentre && bendTouch)
@@ -301,6 +303,7 @@ void TurntableEngine::process (AudioBuffer<float>& output, const MidiBuffer& mid
 
     refreshChops (p);
     currentHandTau = (double) jmax (0.0005f, p.handTau);
+    currentSensitivity = (double) p.sensitivity;
 
     // Host transport sync: deterministic restart on play, motor follows transport.
     const bool hostPlaying = host.valid && host.playing;
@@ -317,13 +320,15 @@ void TurntableEngine::process (AudioBuffer<float>& output, const MidiBuffer& mid
         firstBlock = false;
     }
 
-    // Automatable touch
-    const bool touchPressed = p.touch && ! paramTouch;
-    if (p.touch != paramTouch)
+    // Automatable touch and hold
+    const bool wasTouching = touching;
+    if (p.touch != paramTouch || p.hold != holdTouch)
     {
         paramTouch = p.touch;
+        holdTouch = p.hold;
         updateTouch();
     }
+    const bool touchPressed = touching && ! wasTouching;
 
     // Automatable hand position: ramp linearly across the block. The hand is
     // relative to where the record was grabbed, so a jump in the Scratch value
@@ -384,6 +389,12 @@ void TurntableEngine::renderSegment (float* left, float* right, int start, int n
     const double brakeAccel = 1.0 / jmax (0.005f, p.brakeTime) * dt;
     const double slipAccel = 1.0 / jmax (0.002f, p.slipTime) * dt;
     const double w0 = 1.0 / jmax (0.0005f, p.handTau);
+    // two cascaded stages of tau/2: a 2nd-order glide, so control steps become continuous motion
+    const double inputCoeff = p.inputTau > 0.0001f ? 1.0 - std::exp (-dt / (0.5 * (double) p.inputTau)) : 1.0;
+    const double fast = (double) p.fastSmooth;
+    // Smooth 4: widen the anti-alias kernel further as the record goes faster,
+    // taking the fizz off very fast cuts.
+    auto kernelSpeed = [fast] (double v) { return v * (1.0 + 1.5 * fast * jmax (0.0, std::abs (v) - 1.0)); };
 
     const float noiseGain = p.noise * p.noise * noiseScale;
     const float faderCoeff = 1.0f - std::exp (-1.0f / (0.0006f * (float) sampleRate));
@@ -419,8 +430,12 @@ void TurntableEngine::renderSegment (float* left, float* right, int start, int n
         // --- record: hand, brake or slipmat friction ----------------------------
         if (touching)
         {
-            hand += scratchRampStep;
-            handVelocity = scratchRampStep / dt;
+            // Smooth 2: interpolate between control points (mouse, MIDI, automation steps)
+            handRaw += scratchRampStep;
+            const double previousHand = hand;
+            handMid += (handRaw - handMid) * inputCoeff;
+            hand += (handMid - hand) * inputCoeff;
+            handVelocity = inputCoeff >= 1.0 ? scratchRampStep / dt : (hand - previousHand) / dt;
             // critically damped spring: hand + fingertip compliance + record inertia
             const double accel = w0 * w0 * (hand - position) + 2.0 * w0 * (handVelocity - speed);
             speed += accel * dt;
@@ -442,7 +457,7 @@ void TurntableEngine::renderSegment (float* left, float* right, int start, int n
         float sL = 0.0f, sR = 0.0f, sN = 0.0f;
         if (record != nullptr)
         {
-            auto f = reader.read (src, position * srcRate, speed * rateRatio);
+            auto f = reader.read (src, position * srcRate, kernelSpeed (speed) * rateRatio);
             const float velocityGain = p.phono ? (float) speed : 1.0f; // cartridge output ~ stylus velocity
             sL = f.left * velocityGain * mainGain;
             sR = f.right * velocityGain * mainGain;
@@ -451,7 +466,7 @@ void TurntableEngine::renderSegment (float* left, float* right, int start, int n
             if (ghost.gain > 0.0f)
             {
                 ghost.position += ghost.speed * dt;
-                auto g = reader.read (src, ghost.position * srcRate, ghost.speed * rateRatio);
+                auto g = reader.read (src, ghost.position * srcRate, kernelSpeed (ghost.speed) * rateRatio);
                 const float gv = p.phono ? (float) ghost.speed : 1.0f;
                 sL += g.left * gv * ghost.gain;
                 sR += g.right * gv * ghost.gain;
@@ -484,7 +499,7 @@ void TurntableEngine::renderSegment (float* left, float* right, int start, int n
             --faderRampRemaining;
         }
         const float x = p.hamster ? 1.0f - faderValue : faderValue;
-        const bool gated = noteCut || cutNotesHeld > 0;
+        const bool gated = p.mute || noteCut || cutNotesHeld > 0;
         const float faderTarget = gated ? 0.0f : faderLaw (x, p.faderCurve);
         faderGain += (faderTarget - faderGain) * faderCoeff;
         noteGain += (noteGainTarget - noteGain) * smoothCoeff;

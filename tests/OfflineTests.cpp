@@ -358,6 +358,124 @@ int main (int argc, char** argv)
     }
 
     // -------------------------------------------------------------------------
+    std::cout << "Deck controls: hold, mute, transport, speed, acc, sen" << std::endl;
+    {
+        // HOLD stops the record, and the Scratch parameter then moves it with no Touch needed
+        auto p = makeProcessor();
+        render (*p, 0.3);
+        setParam (*p, ParamID::hold, 1.0f);
+        render (*p, 0.2);
+        check (std::abs (p->engine.uiSpeed.load()) < 0.01f, "HOLD stops the record");
+        const double held = p->engine.uiRecordAngle.load();
+        setParam (*p, ParamID::scratch, 0.4f);
+        render (*p, 0.2);
+        const double moved = (p->engine.uiRecordAngle.load() - held) * TurntableEngine::secondsPerRotation;
+        check (std::abs (moved - 0.4 * 0.5 * TurntableEngine::secondsPerRotation) < 0.01,
+               "with HOLD on, Scratch moves the record directly (" + String (moved, 3) + " s)");
+        setParam (*p, ParamID::hold, 0.0f);
+        render (*p, 0.2);
+        check (std::abs (p->engine.uiSpeed.load() - 1.0f) < 0.001f, "HOLD off lets the record go");
+
+        // MUTE is silent and click-free
+        auto m = makeProcessor();
+        auto out = render (*m, 1.5, [&] (double t, MidiBuffer&) { setParam (*m, ParamID::mute, (t > 0.5 && t < 1.0) ? 1.0f : 0.0f); });
+        check (analyse (out, (int) (0.52 * sampleRate), (int) (0.98 * sampleRate)).peak < 1.0e-4f, "MUTE silences the deck");
+        check (analyse (out).maxStep < 0.8f, "MUTE is click-free");
+
+        // Transport: play backwards
+        auto r = makeProcessor();
+        setParam (*r, ParamID::reverse, 1.0f);
+        render (*r, 0.7);
+        const float midway = r->engine.uiSpeed.load();
+        render (*r, 1.0);
+        check (midway > -0.6f && midway < 0.6f, "reversing ramps through zero with the motor's torque (" + String (midway, 2) + "x after 0.7 s)");
+        check (std::abs (r->engine.uiSpeed.load() + 1.0f) < 0.001f, "plays backwards at -1x");
+
+        // SPEED knob
+        auto sp = makeProcessor();
+        setParam (*sp, ParamID::speed, 2.0f);
+        render (*sp, 2.0);
+        check (std::abs (sp->engine.uiSpeed.load() - 2.0f) < 0.001f, "SPEED 2x plays at 2x");
+
+        // ACC: higher acceleration reaches speed sooner
+        auto startAfter = [] (float acc)
+        {
+            auto q = makeProcessor();
+            setParam (*q, ParamID::accel, acc);
+            setParam (*q, ParamID::motor, 0.0f);
+            render (*q, 3.0);
+            setParam (*q, ParamID::motor, 1.0f);
+            render (*q, 0.15);
+            return q->engine.uiSpeed.load();
+        };
+        const float slowAcc = startAfter (0.2f), fastAcc = startAfter (0.8f);
+        check (fastAcc > slowAcc && fastAcc > 0.99f, "ACC: more acceleration starts faster (" + String (slowAcc, 2) + "x vs " + String (fastAcc, 2) + "x after 150 ms)");
+
+        // SEN scales controller movement
+        auto jogDistance = [] (float sen)
+        {
+            auto q = makeProcessor();
+            setParam (*q, ParamID::sensitivity, sen);
+            setParam (*q, ParamID::hold, 1.0f);
+            render (*q, 0.2);
+            const double before = q->engine.uiRecordAngle.load();
+            render (*q, 0.1, [&] (double, MidiBuffer& mb) { mb.addEvent (MidiMessage::controllerEvent (1, 16, 64 + 8), 0); });
+            render (*q, 0.2);
+            return q->engine.uiRecordAngle.load() - before;
+        };
+        const double d1 = jogDistance (1.0f), d2 = jogDistance (2.0f);
+        check (std::abs (d2 / d1 - 2.0) < 0.02, "SEN 2x moves the record twice as far (" + String (d2 / d1, 3) + "x)");
+    }
+
+    // -------------------------------------------------------------------------
+    std::cout << "Smoothing" << std::endl;
+    {
+        // Smooth 2 (input) evens out stepped control input: a coarse staircase of
+        // pitch-bend steps makes the record lurch; smoothing turns it into a glide.
+        auto speedWobble = [] (float inputMs)
+        {
+            auto q = makeProcessor();
+            setParam (*q, ParamID::inputSmooth, inputMs);
+            setParam (*q, ParamID::hold, 1.0f);
+            render (*q, 0.3);
+            std::vector<float> speeds;
+            for (int step = 0; step < 32; ++step)
+            {
+                render (*q, 0.001, [&] (double, MidiBuffer& mb) { mb.addEvent (MidiMessage::pitchWheel (1, 8192 + 200 * (step + 1)), 0); });
+                for (int ms = 0; ms < 19; ++ms)
+                {
+                    render (*q, 0.001);
+                    if (step >= 16) speeds.push_back (q->engine.uiSpeed.load()); // steady state only
+                }
+            }
+            double mean = 0, var = 0;
+            for (auto v : speeds) mean += v;
+            mean /= (double) speeds.size();
+            for (auto v : speeds) var += (v - mean) * (v - mean);
+            return (float) std::sqrt (var / (double) speeds.size());
+        };
+        const float rough = speedWobble (0.0f), smooth = speedWobble (40.0f);
+        check (smooth < rough * 0.5f, "Smooth 2 evens out stepped input (speed wobble " + String (rough, 2) + " -> " + String (smooth, 2) + ")");
+
+        // Smooth 4 (fast) takes the top off fast cuts (~2.7x peak speed)
+        auto highFreqEnergy = [] (float fast)
+        {
+            auto q = makeProcessor();
+            setParam (*q, ParamID::noise, 0.0f);
+            setParam (*q, ParamID::fastSmooth, fast);
+            render (*q, 0.4); // into the middle of the "ahh"
+            setParam (*q, ParamID::touch, 1.0f);
+            auto o = render (*q, 1.0, [&] (double t, MidiBuffer&) { setParam (*q, ParamID::scratch, (float) (0.2 * std::sin (t * 15.0))); });
+            double e = 0;
+            const float* d = o.getReadPointer (0);
+            for (int i = 2; i < o.getNumSamples(); ++i) { const double h = d[i] - 2.0 * d[i - 1] + d[i - 2]; e += h * h; }
+            return (float) e;
+        };
+        const float sharp = highFreqEnergy (0.0f), soft = highFreqEnergy (1.0f);
+        check (soft < sharp * 0.8f, "Smooth 4 softens fast cuts (top-end energy " + String (dB (std::sqrt (soft / sharp)), 1) + " dB)");
+    }
+
+    // -------------------------------------------------------------------------
     std::cout << "Sample loading + session state" << std::endl;
     {
         const File wav = outDir.getChildFile ("test-sample.wav");

@@ -39,6 +39,7 @@ private:
     juce::RangedAudioParameter* touchParam = nullptr;
     juce::RangedAudioParameter* scratchParam = nullptr;
     juce::RangedAudioParameter* rangeParam = nullptr;
+    juce::RangedAudioParameter* sensitivityParam = nullptr;
 
     juce::Point<float> centre;
     float platterRadius = 0, vinylRadius = 0, labelRadius = 0;

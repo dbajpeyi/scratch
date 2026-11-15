@@ -53,13 +53,24 @@ AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
     layout.add (floatParam (ParamID::scratch, "Scratch", { -1.0f, 1.0f }, 0.0f, "", 3));
     layout.add (floatParam (ParamID::fader, "Crossfader", { 0.0f, 1.0f }, 1.0f, "", 3));
     layout.add (std::make_unique<AudioParameterBool> (pid (ParamID::motor), "Start/Stop", true));
+    layout.add (std::make_unique<AudioParameterBool> (pid (ParamID::reverse), "Reverse", false));
+    layout.add (std::make_unique<AudioParameterBool> (pid (ParamID::hold), "Hold", false));
+    layout.add (std::make_unique<AudioParameterBool> (pid (ParamID::mute), "Mute", false));
     layout.add (floatParam (ParamID::pitch, "Pitch", { -1.0f, 1.0f }, 0.0f, "", 3));
 
     // --- Deck feel ----------------------------------------------------------
     layout.add (floatParam (ParamID::range, "Scratch Range", skewed (0.05f, 2.0f, 0.5f), 0.5f, "rot"));
-    layout.add (floatParam (ParamID::handSmooth, "Hand Smoothing", skewed (1.0f, 60.0f, 10.0f), 10.0f, "ms", 1));
-    layout.add (floatParam (ParamID::slipmat, "Slipmat Grip", skewed (5.0f, 400.0f, 50.0f), 45.0f, "ms", 0));
-    layout.add (floatParam (ParamID::startTime, "Start Time", skewed (0.02f, 4.0f, 0.7f), 0.7f, "s"));
+    layout.add (floatParam (ParamID::handSmooth, "Smooth 1: Hand", skewed (1.0f, 60.0f, 10.0f), 10.0f, "ms", 1));
+    layout.add (floatParam (ParamID::inputSmooth, "Smooth 2: Input", skewed (0.0f, 100.0f, 15.0f), 0.0f, "ms", 1));
+    layout.add (floatParam (ParamID::slipmat, "Smooth 3: Slipmat", skewed (5.0f, 400.0f, 50.0f), 45.0f, "ms", 0));
+    layout.add (floatParam (ParamID::fastSmooth, "Smooth 4: Fast Cuts", { 0.0f, 1.0f }, 0.0f, ""));
+    layout.add (floatParam (ParamID::speed, "Speed", skewed (0.25f, 4.0f, 1.0f), 1.0f, "x"));
+    {
+        AudioParameterFloatAttributes attrs;
+        layout.add (std::make_unique<AudioParameterFloat> (pid (ParamID::accel), "Acceleration", NormalisableRange<float> (0.0f, 1.0f), 0.33f,
+            attrs.withStringFromValueFunction ([] (float v, int) { return String (roundToInt (v * 100.0f)) + "% (" + String (accelToStartTime (v), 2) + " s)"; })));
+    }
+    layout.add (floatParam (ParamID::sensitivity, "Sensitivity", skewed (0.1f, 4.0f, 1.0f), 1.0f, "x"));
     layout.add (floatParam (ParamID::brakeTime, "Brake Time", skewed (0.02f, 6.0f, 1.0f), 1.0f, "s"));
     layout.add (std::make_unique<AudioParameterChoice> (pid (ParamID::rpm), "Speed", Choices::rpm, 0));
     layout.add (std::make_unique<AudioParameterChoice> (pid (ParamID::pitchRange), "Pitch Range", Choices::pitchRange, 0));
