@@ -95,17 +95,25 @@ the slipmat pull it up to speed.
 
 Pre-built universal (Apple Silicon + Intel) binaries come from GitHub Actions.
 Open the repo's **Actions** tab, open the latest *Build* run and download the
-**CrateCut-macOS** artifact. Then:
+**CrateCut-macOS** artifact. Unzip it until you have a `CrateCut` folder, then:
 
-```bash
-unzip CrateCut-VST3-mac.zip -d ~/Library/Audio/Plug-Ins/VST3/
-unzip CrateCut-AU-mac.zip   -d ~/Library/Audio/Plug-Ins/Components/
-# the builds are ad-hoc signed, not notarised: clear the download quarantine
-xattr -dr com.apple.quarantine ~/Library/Audio/Plug-Ins/VST3/CrateCut.vst3 \
-                               ~/Library/Audio/Plug-Ins/Components/CrateCut.component
-```
+1. Double-click **Install CrateCut.command**.
+2. **First time only:** macOS blocks it because it isn't notarised by Apple.
+   Click *Done*, open **System Settings → Privacy & Security**, scroll down
+   and click **Open Anyway** next to "Install CrateCut.command".
+3. A Terminal window installs everything and says when it's done. You don't
+   need to type anything.
 
-Pushing a tag like `v0.1.0` also attaches the zips to a GitHub Release.
+The installer copies the VST3, the Audio Unit and the standalone app into
+your user folders (`~/Library/Audio/Plug-Ins/…` and `~/Applications`). It
+clears the download quarantine, re-signs the plugins locally and refreshes the
+Audio Unit cache. No admin password is needed. Then restart FL Studio and run
+**Options → Manage plugins → Find installed plugins**.
+
+The one-time "Open Anyway" step only goes away if the build is signed and
+notarised with a paid Apple Developer ID.
+
+Pushing a tag like `v0.1.0` also attaches `CrateCut-mac.zip` to a GitHub Release.
 
 ## Building from source
 

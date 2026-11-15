@@ -26,18 +26,30 @@ jobs:
       - name: Sign (ad-hoc) and package
         run: |
           ART=build/CrateCut_artefacts/Release
-          mkdir -p dist
+          PKG=dist/CrateCut
+          mkdir -p "$PKG"
           for b in "$ART/VST3/CrateCut.vst3" "$ART/AU/CrateCut.component" "$ART/Standalone/CrateCut.app"; do
             codesign --force --deep --sign - "$b"
+            ditto "$b" "$PKG/$(basename "$b")"
           done
-          ditto -c -k --keepParent "$ART/VST3/CrateCut.vst3"      dist/CrateCut-VST3-mac.zip
-          ditto -c -k --keepParent "$ART/AU/CrateCut.component"   dist/CrateCut-AU-mac.zip
-          ditto -c -k --keepParent "$ART/Standalone/CrateCut.app" dist/CrateCut-Standalone-mac.zip
+          cp "packaging/Install CrateCut.command" "packaging/READ ME FIRST.txt" "$PKG/"
+          chmod +x "$PKG/Install CrateCut.command"
+          # ditto keeps the executable bit and bundle signatures intact inside the zip
+          ditto -c -k --keepParent "$PKG" dist/CrateCut-mac.zip
 
       - uses: actions/upload-artifact@v5
         with:
           name: CrateCut-macOS
-          path: dist/*.zip
+          path: dist/CrateCut-mac.zip
+
+      - name: Test the installer
+        run: |
+          FAKE_HOME=$(mktemp -d)
+          echo | HOME="$FAKE_HOME" "dist/CrateCut/Install CrateCut.command"
+          codesign --verify --deep --strict "$FAKE_HOME/Library/Audio/Plug-Ins/VST3/CrateCut.vst3"
+          codesign --verify --deep --strict "$FAKE_HOME/Library/Audio/Plug-Ins/Components/CrateCut.component"
+          codesign --verify --deep --strict "$FAKE_HOME/Applications/CrateCut.app"
+          echo "Installer OK"
 
       - name: Validate the Audio Unit (auval)
         run: |
@@ -50,7 +62,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*.zip
+          files: dist/CrateCut-mac.zip
 
   tests:
     name: Linux (offline DSP tests)

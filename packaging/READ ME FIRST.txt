@@ -1,0 +1,26 @@
+CrateCut - installing on macOS
+==============================
+
+1. Double-click "Install CrateCut.command".
+
+   The first time, macOS will say it can't verify the developer
+   (CrateCut isn't notarised by Apple). That's expected:
+
+     - Click "Done" (or "OK") on that message.
+     - Open System Settings > Privacy & Security.
+     - Scroll down to the message about "Install CrateCut.command"
+       and click "Open Anyway", then confirm.
+
+   A Terminal window opens, installs everything and tells you when
+   it's done. You don't need to type anything.
+
+2. Restart FL Studio, then Options > Manage plugins >
+   Find installed plugins. CrateCut appears under Generators.
+
+What gets installed (for your user only, no admin password):
+   CrateCut.vst3       -> ~/Library/Audio/Plug-Ins/VST3
+   CrateCut.component  -> ~/Library/Audio/Plug-Ins/Components
+   CrateCut.app        -> ~/Applications   (standalone version)
+
+To uninstall, delete those three items.
+(In Finder: Go > Go to Folder..., paste the folder path.)
