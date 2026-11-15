@@ -4,8 +4,6 @@ using namespace juce;
 
 namespace
 {
-    const String audioWildcard = "*.wav;*.aif;*.aiff;*.flac;*.mp3;*.ogg;*.m4a;*.caf";
-
     void drawSectionLabel (Graphics& g, const String& text, int x, int y)
     {
         g.setColour (Palette::dim);
@@ -345,7 +343,7 @@ void CrateCutEditor::setTransport (bool motorOn, bool reverse)
 
 void CrateCutEditor::openFileChooser()
 {
-    chooser = std::make_unique<FileChooser> ("Load a sample to press", File(), audioWildcard);
+    chooser = std::make_unique<FileChooser> ("Load a sample to press", File(), proc.formats.getWildcardForAllFormats());
     chooser->launchAsync (FileBrowserComponent::openMode | FileBrowserComponent::canSelectFiles,
                           [this] (const FileChooser& fc)
                           {
@@ -372,10 +370,17 @@ void CrateCutEditor::showStatus (const String& text, bool isError)
     content.repaint (0, 0, baseWidth, 50);
 }
 
+bool CrateCutEditor::canLoad (const File& file) const
+{
+    // Ask the format manager rather than keeping our own list, so anything the
+    // platform can decode (on macOS: wav, aiff, flac, mp3, m4a/aac, caf...) is accepted.
+    return proc.formats.findFormatForFileExtension (file.getFileExtension()) != nullptr;
+}
+
 bool CrateCutEditor::isInterestedInFileDrag (const StringArray& files)
 {
     for (auto& f : files)
-        if (File (f).hasFileExtension (audioWildcard))
+        if (canLoad (File (f)))
             return true;
     return false;
 }
@@ -384,7 +389,7 @@ void CrateCutEditor::filesDropped (const StringArray& files, int, int)
 {
     dragHover = false;
     for (auto& f : files)
-        if (File (f).hasFileExtension (audioWildcard))
+        if (canLoad (File (f)))
         {
             loadFile (File (f));
             break;

@@ -511,6 +511,44 @@ int main (int argc, char** argv)
     }
 
     // -------------------------------------------------------------------------
+    std::cout << "Drag and drop onto the editor" << std::endl;
+    {
+        const File wav = outDir.getChildFile ("dropped-break.wav");
+        const File upper = outDir.getChildFile ("LOUD.WAV");
+        const File text = outDir.getChildFile ("notes.txt");
+        {
+            AudioBuffer<float> b (2, 22050);
+            for (int i = 0; i < b.getNumSamples(); ++i)
+                for (int ch = 0; ch < 2; ++ch)
+                    b.setSample (ch, i, 0.4f * (float) std::sin (MathConstants<double>::twoPi * 330.0 * i / 44100.0));
+            for (auto& f : { wav, upper })
+            {
+                f.deleteFile();
+                WavAudioFormat fmt;
+                std::unique_ptr<AudioFormatWriter> w (fmt.createWriterFor (new FileOutputStream (f), 44100.0, 2, 16, {}, 0));
+                w->writeFromAudioSampleBuffer (b, 0, b.getNumSamples());
+            }
+            text.replaceWithText ("not audio");
+        }
+
+        auto p = makeProcessor();
+        std::unique_ptr<AudioProcessorEditor> ed (p->createEditor());
+        auto* editor = dynamic_cast<CrateCutEditor*> (ed.get());
+
+        check (editor->isInterestedInFileDrag ({ wav.getFullPathName() }), "accepts a dragged .wav");
+        check (editor->isInterestedInFileDrag ({ upper.getFullPathName() }), "accepts an upper-case .WAV");
+        check (! editor->isInterestedInFileDrag ({ text.getFullPathName() }), "ignores a non-audio file");
+        check (editor->isInterestedInFileDrag ({ text.getFullPathName(), wav.getFullPathName() }), "accepts a mixed selection that contains audio");
+
+        editor->filesDropped ({ text.getFullPathName(), wav.getFullPathName() }, 10, 10);
+        auto rec = p->getRecord();
+        check (rec != nullptr && rec->name == "dropped-break" && rec->getLength() == 22050, "dropping loads the audio file");
+        auto out = render (*p, 0.3);
+        check (analyse (out, (int) (0.05 * sampleRate)).rms > 0.05f, "the dropped sample plays");
+        ed = nullptr;
+    }
+
+    // -------------------------------------------------------------------------
     std::cout << "Performance" << std::endl;
     {
         auto p = makeProcessor();

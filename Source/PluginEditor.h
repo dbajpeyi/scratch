@@ -69,6 +69,7 @@ private:
     void placeCombo (Combo&, juce::Rectangle<int>);
     void openFileChooser();
     void loadFile (const juce::File&);
+    bool canLoad (const juce::File&) const;
     void showStatus (const juce::String&, bool isError);
     void setRpm (int index);
     void syncButtons();
