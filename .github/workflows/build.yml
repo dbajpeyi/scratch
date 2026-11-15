@@ -58,12 +58,6 @@ jobs:
           killall -9 AudioComponentRegistrar || true
           auval -v aumu Ccdk Crcu
 
-      - name: Attach to release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
-        with:
-          files: dist/CrateCut-mac.zip
-
   tests:
     name: Linux (offline DSP tests)
     runs-on: ubuntu-24.04
@@ -89,3 +83,27 @@ jobs:
         with:
           name: test-renders
           path: test-output/
+
+  release:
+    name: Publish GitHub Release
+    # Only for version tags, and only once the Mac build (incl. installer test
+    # and auval) and the DSP tests have all passed.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [macos, tests]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/download-artifact@v5
+        with:
+          name: CrateCut-macOS
+          path: dist
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          name: CrateCut ${{ github.ref_name }}
+          body_path: packaging/RELEASE_NOTES.md
+          generate_release_notes: true
+          make_latest: true
+          fail_on_unmatched_files: true
+          files: dist/CrateCut-mac.zip

@@ -115,9 +115,9 @@ the slipmat pull it up to speed.
 
 ## Installing (macOS)
 
-Pre-built universal (Apple Silicon + Intel) binaries come from GitHub Actions.
-Open the repo's **Actions** tab, open the latest *Build* run and download the
-**CrateCut-macOS** artifact. Unzip it until you have a `CrateCut` folder, then:
+**[Download CrateCut-mac.zip](https://github.com/dbajpeyi/scratch/releases/latest/download/CrateCut-mac.zip)**
+(latest release: universal VST3 + Audio Unit + standalone app, for Apple
+Silicon and Intel). Unzip it and open the `CrateCut` folder, then:
 
 1. Double-click **Install CrateCut.command**.
 2. **First time only:** macOS blocks it because it isn't notarised by Apple.
@@ -135,7 +135,22 @@ Audio Unit cache. No admin password is needed. Then restart FL Studio and run
 The one-time "Open Anyway" step only goes away if the build is signed and
 notarised with a paid Apple Developer ID.
 
-Pushing a tag like `v0.1.0` also attaches `CrateCut-mac.zip` to a GitHub Release.
+Every push also builds a zip you can grab from the **Actions** tab (kept for 90
+days). Releases are permanent.
+
+### Making a release
+
+Bump `VERSION` in `CMakeLists.txt`, then tag and push:
+
+```bash
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+CI builds and tests the Mac plugins and checks the installer and auval. Only if
+everything passes does it publish a GitHub Release with `CrateCut-mac.zip`
+attached. It uses the install notes in `packaging/RELEASE_NOTES.md` and adds the
+changes since the last tag. The download link above always points at the newest
+release.
 
 ## Building from source
 
