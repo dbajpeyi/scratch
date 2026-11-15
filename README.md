@@ -140,17 +140,18 @@ days). Releases are permanent.
 
 ### Making a release
 
-Bump `VERSION` in `CMakeLists.txt`, then tag and push:
+1. Bump `VERSION` in `CMakeLists.txt` (optional, but keeps the plugin's
+   reported version in step).
+2. On GitHub, open **Actions → Build → Run workflow**, pick `main` and enter
+   the version, e.g. `0.1.0`.
 
-```bash
-git tag v0.2.0 && git push origin v0.2.0
-```
+(Pushing a tag such as `v0.1.0` does the same thing.)
 
 CI builds and tests the Mac plugins and checks the installer and auval. Only if
-everything passes does it publish a GitHub Release with `CrateCut-mac.zip`
-attached. It uses the install notes in `packaging/RELEASE_NOTES.md` and adds the
-changes since the last tag. The download link above always points at the newest
-release.
+everything passes does it create the `v…` tag and publish a GitHub Release
+with `CrateCut-mac.zip` attached. It uses the install notes in
+`packaging/RELEASE_NOTES.md` and adds the changes since the last release. The
+download link above always points at the newest release.
 
 ## Building from source
 
